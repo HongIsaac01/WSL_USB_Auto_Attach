@@ -13,11 +13,19 @@
      "workspace"
   ],
   "activationEvents": [
+    "onView:wslUsbManager.devicesView",
+
     "onCommand:wslUsbManager.showDevices",
     "onCommand:wslUsbManager.attachDevice",
     "onCommand:wslUsbManager.detachDevice",
     "onCommand:wslUsbManager.manageAutoAttach",
-    "onCommand:wslUsbManager.showAttachedDevices"
+    "onCommand:wslUsbManager.showAttachedDevices",
+
+    "onCommand:wslUsbManager.refresh",
+    "onCommand:wslUsbManager.treeAttach",
+    "onCommand:wslUsbManager.treeDetach",
+    "onCommand:wslUsbManager.treeEnableAutoAttach",
+    "onCommand:wslUsbManager.treeDisableAutoAttach"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -43,8 +51,112 @@
       {
           "command": "wslUsbManager.showAttachedDevices",
           "title": "WSL USB: Show Attached Devices"
+      },
+      {
+          "command": "wslUsbManager.refresh",
+          "title": "Refresh USB Devices",
+          "icon": "$(refresh)"
+      }, 
+      {
+          "command": "wslUsbManager.treeAttach",
+          "title": "Attach to WSL",
+          "icon": "$(plug)"
+      },
+      {
+          "command": "wslUsbManager.treeDetach",
+          "title": "Detach from WSL",
+          "icon": "$(debug-disconnect)"
+      },
+      {
+          "command": "wslUsbManager.treeEnableAutoAttach",
+          "title": "Enable Auto Attach",
+          "icon": "$(pass)"
+      },
+      {
+          "command": "wslUsbManager.treeDisableAutoAttach",
+          "title": "Disable Auto Attach",
+          "icon": "$(close)"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "wslUsbManager",
+          "title": "WSL USB",
+          "icon": "media/usb.svg"
+        }
+      ]
+    },
+    "views": {
+      "wslUsbManager": [
+        {
+          "id": "wslUsbManager.devicesView",
+          "name": "USB Devices"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "wslUsbManager.refresh",
+          "when": "view == wslUsbManager.devicesView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+          {
+              "command": "wslUsbManager.treeAttach",
+              "when": "view == wslUsbManager.devicesView && viewItem == availableDevice",
+              "group": "inline"
+          },
+          {
+              "command": "wslUsbManager.treeAttach",
+              "when": "view == wslUsbManager.devicesView && viewItem == availableAutoDevice",
+              "group": "inline"
+          },
+
+          {
+              "command": "wslUsbManager.treeDetach",
+              "when": "view == wslUsbManager.devicesView && viewItem == attachedDevice",
+              "group": "inline"
+          },
+          {
+              "command": "wslUsbManager.treeDetach",
+              "when": "view == wslUsbManager.devicesView && viewItem == attachedAutoDevice",
+              "group": "inline"
+          },
+          {
+              "command": "wslUsbManager.treeEnableAutoAttach",
+              "when": "view == wslUsbManager.devicesView && viewItem == availableDevice",
+              "group": "auto@1"
+          },
+          {
+              "command": "wslUsbManager.treeEnableAutoAttach",
+              "when": "view == wslUsbManager.devicesView && viewItem == attachedDevice",
+              "group": "auto@1"
+          },
+          {
+              "command": "wslUsbManager.treeDisableAutoAttach",
+              "when": "view == wslUsbManager.devicesView && viewItem == availableAutoDevice",
+              "group": "auto@1"
+          },
+          {
+              "command": "wslUsbManager.treeDisableAutoAttach",
+              "when": "view == wslUsbManager.devicesView && viewItem == attachedAutoDevice",
+              "group": "auto@1"
+          },
+          {
+              "command": "wslUsbManager.treeDisableAutoAttach",
+              "when": "view == wslUsbManager.devicesView && viewItem == managedAttachedDevice",
+              "group": "inline"
+          },
+          {
+              "command": "wslUsbManager.treeDisableAutoAttach",
+              "when": "view == wslUsbManager.devicesView && viewItem == managedAvailableDevice",
+              "group": "inline"
+          }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

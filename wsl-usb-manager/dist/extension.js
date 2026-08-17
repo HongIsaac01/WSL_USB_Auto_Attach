@@ -34,7 +34,7 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode = __toESM(require("vscode"));
+var vscode2 = __toESM(require("vscode"));
 
 // src/usbipd.ts
 var import_child_process = require("child_process");
@@ -163,54 +163,242 @@ var AutoAttachStore = class {
   }
 };
 
+// src/deviceTreeProvider.ts
+var vscode = __toESM(require("vscode"));
+var DeviceTreeProvider = class {
+  constructor(store2) {
+    this.store = store2;
+  }
+  store;
+  _onDidChangeTreeData = new vscode.EventEmitter();
+  onDidChangeTreeData = this._onDidChangeTreeData.event;
+  //
+  // usbipd list 결과 cache
+  //
+  devices = [];
+  /**
+   * extension.ts에서 읽은 최신 USB 목록을 전달한다.
+   *
+   * DeviceTreeProvider 자체에서는 usbipd.exe를 호출하지 않는다.
+   */
+  updateDevices(devices) {
+    this.devices = devices;
+    this.refresh();
+  }
+  refresh() {
+    this._onDidChangeTreeData.fire();
+  }
+  getTreeItem(element) {
+    if (element.type === "section") {
+      const item2 = new vscode.TreeItem(
+        element.label,
+        vscode.TreeItemCollapsibleState.Expanded
+      );
+      item2.contextValue = "wslUsbSection";
+      return item2;
+    }
+    const device = element.device;
+    const attached = isAttached(device);
+    const autoAttach = this.store.has(
+      device.vid,
+      device.pid
+    );
+    const disconnected = device.state === "Disconnected";
+    const item = new vscode.TreeItem(
+      device.device,
+      vscode.TreeItemCollapsibleState.None
+    );
+    item.description = disconnected ? `${device.vid}:${device.pid} \xB7 Disconnected` : `${device.vid}:${device.pid}`;
+    item.tooltip = [
+      device.device,
+      `VID:PID: ${device.vid}:${device.pid}`,
+      device.busId ? `BUSID: ${device.busId}` : "BUSID: Not connected",
+      disconnected ? "State: Disconnected" : `State: ${getDeviceStateLabel(device)}`,
+      `Auto Attach: ${autoAttach ? "ON" : "OFF"}`
+    ].join("\n");
+    if (element.section === "attached") {
+      item.contextValue = autoAttach ? "attachedAutoDevice" : "attachedDevice";
+      item.iconPath = new vscode.ThemeIcon(
+        "vm-active"
+      );
+    } else if (element.section === "available") {
+      item.contextValue = autoAttach ? "availableAutoDevice" : "availableDevice";
+      item.iconPath = new vscode.ThemeIcon(
+        "plug"
+      );
+    } else {
+      item.contextValue = attached ? "managedAttachedDevice" : "managedAvailableDevice";
+      item.iconPath = new vscode.ThemeIcon(
+        disconnected ? "circle-slash" : attached ? "vm-active" : "check"
+      );
+    }
+    return item;
+  }
+  getChildren(element) {
+    const devices = this.devices;
+    if (!element) {
+      return [
+        {
+          type: "section",
+          label: "Attached to WSL",
+          section: "attached"
+        },
+        {
+          type: "section",
+          label: "Available on Windows",
+          section: "available"
+        },
+        {
+          type: "section",
+          label: "Auto Attach Devices",
+          section: "managed"
+        }
+      ];
+    }
+    if (element.type !== "section") {
+      return [];
+    }
+    switch (element.section) {
+      //
+      // 현재 WSL에 attach된 실제 USB
+      //
+      case "attached":
+        return devices.filter(isAttached).map((device) => ({
+          type: "device",
+          device,
+          section: "attached"
+        }));
+      //
+      // 현재 Windows 측에서 사용 가능한 USB
+      //
+      case "available":
+        return devices.filter(
+          (device) => !isAttached(device)
+        ).map((device) => ({
+          type: "device",
+          device,
+          section: "available"
+        }));
+      //
+      // Auto Attach 등록 목록
+      //
+      // 현재 USB가 빠져 있어도 표시한다.
+      //
+      case "managed": {
+        const managedDevices = this.store.getAll();
+        return managedDevices.map(
+          (managed) => {
+            const connectedDevice = devices.find(
+              (device2) => device2.vid === managed.vid && device2.pid === managed.pid
+            );
+            const device = connectedDevice ?? {
+              busId: "",
+              vid: managed.vid,
+              pid: managed.pid,
+              device: managed.name,
+              state: "Disconnected"
+            };
+            return {
+              type: "device",
+              device,
+              section: "managed"
+            };
+          }
+        );
+      }
+    }
+  }
+};
+
 // src/extension.ts
 var store;
 var autoAttachTimer;
 var autoAttachRunning = false;
 var autoAttachedBusIds = /* @__PURE__ */ new Set();
+var autoAttachSuppressed = /* @__PURE__ */ new Set();
+var treeProvider;
+var lastDeviceSnapshot = "";
+function getDeviceKey(vid, pid) {
+  return `${vid.toLowerCase()}:${pid.toLowerCase()}`;
+}
 function activate(context) {
   console.log(
     "WSL USB Manager activated",
     "platform:",
     process.platform,
     "remoteName:",
-    vscode.env.remoteName
+    vscode2.env.remoteName
   );
   store = new AutoAttachStore(context);
   context.subscriptions.push(
-    vscode.commands.registerCommand(
+    vscode2.commands.registerCommand(
       "wslUsbManager.showDevices",
       showDevices
     ),
-    vscode.commands.registerCommand(
+    vscode2.commands.registerCommand(
       "wslUsbManager.showAttachedDevices",
       showAttachedDevices
     ),
-    vscode.commands.registerCommand(
+    vscode2.commands.registerCommand(
       "wslUsbManager.attachDevice",
       attachDevice
     ),
-    vscode.commands.registerCommand(
+    vscode2.commands.registerCommand(
       "wslUsbManager.detachDevice",
       detachDevice
     ),
-    vscode.commands.registerCommand(
+    vscode2.commands.registerCommand(
       "wslUsbManager.manageAutoAttach",
       manageAutoAttach
+    ),
+    vscode2.commands.registerCommand(
+      "wslUsbManager.treeAttach",
+      attachTreeDevice
+    ),
+    vscode2.commands.registerCommand(
+      "wslUsbManager.treeDetach",
+      detachTreeDevice
+    ),
+    vscode2.commands.registerCommand(
+      "wslUsbManager.treeEnableAutoAttach",
+      enableTreeAutoAttach
+    ),
+    vscode2.commands.registerCommand(
+      "wslUsbManager.treeDisableAutoAttach",
+      disableTreeAutoAttach
+    ),
+    vscode2.commands.registerCommand(
+      "wslUsbManager.refresh",
+      async () => {
+        try {
+          await refreshUsbDevices();
+        } catch (error) {
+          showError(error);
+        }
+      }
     )
   );
+  treeProvider = new DeviceTreeProvider(store);
+  const treeView = vscode2.window.createTreeView(
+    "wslUsbManager.devicesView",
+    {
+      treeDataProvider: treeProvider,
+      showCollapseAll: true
+    }
+  );
+  context.subscriptions.push(treeView);
   startAutoAttachMonitor();
 }
 async function showDevices() {
   try {
     const devices = await listUsbDevices();
     if (devices.length === 0) {
-      vscode.window.showInformationMessage(
+      vscode2.window.showInformationMessage(
         "No USB devices found."
       );
       return;
     }
-    const selected = await vscode.window.showQuickPick(
+    const selected = await vscode2.window.showQuickPick(
       devices.map((device) => {
         const autoAttach = store.has(
           device.vid,
@@ -240,7 +428,7 @@ async function attachDevice() {
     const candidates = devices.filter(
       (device) => !isAttached(device)
     );
-    const selected = await vscode.window.showQuickPick(
+    const selected = await vscode2.window.showQuickPick(
       candidates.map(
         (device) => ({
           label: `${device.vid}:${device.pid}`,
@@ -256,10 +444,17 @@ async function attachDevice() {
     if (!selected) {
       return;
     }
+    autoAttachSuppressed.delete(
+      getDeviceKey(
+        selected.device.vid,
+        selected.device.pid
+      )
+    );
     await attachUsbDevice(
       selected.device.busId
     );
-    vscode.window.showInformationMessage(
+    await refreshUsbDevices();
+    vscode2.window.showInformationMessage(
       `Attached ${selected.device.device}`
     );
   } catch (error) {
@@ -270,7 +465,7 @@ async function detachDevice() {
   try {
     const devices = await listUsbDevices();
     const candidates = devices.filter(isAttached);
-    const selected = await vscode.window.showQuickPick(
+    const selected = await vscode2.window.showQuickPick(
       candidates.map(
         (device) => ({
           label: `${device.vid}:${device.pid}`,
@@ -286,10 +481,20 @@ async function detachDevice() {
     if (!selected) {
       return;
     }
+    autoAttachSuppressed.add(
+      getDeviceKey(
+        selected.device.vid,
+        selected.device.pid
+      )
+    );
+    autoAttachedBusIds.delete(
+      selected.device.busId
+    );
     await detachUsbDevice(
       selected.device.busId
     );
-    vscode.window.showInformationMessage(
+    await refreshUsbDevices();
+    vscode2.window.showInformationMessage(
       `Detached ${selected.device.device}`
     );
   } catch (error) {
@@ -300,12 +505,12 @@ async function manageAutoAttach() {
   try {
     const devices = await listUsbDevices();
     if (devices.length === 0) {
-      vscode.window.showInformationMessage(
+      vscode2.window.showInformationMessage(
         "No USB devices found."
       );
       return;
     }
-    const selected = await vscode.window.showQuickPick(
+    const selected = await vscode2.window.showQuickPick(
       devices.map((device2) => {
         const enabled2 = store.has(
           device2.vid,
@@ -335,7 +540,8 @@ async function manageAutoAttach() {
         device.vid,
         device.pid
       );
-      vscode.window.showInformationMessage(
+      treeProvider.refresh();
+      vscode2.window.showInformationMessage(
         `Auto Attach disabled: ${device.vid}:${device.pid}`
       );
     } else {
@@ -344,7 +550,8 @@ async function manageAutoAttach() {
         pid: device.pid,
         name: device.device
       });
-      vscode.window.showInformationMessage(
+      treeProvider.refresh();
+      vscode2.window.showInformationMessage(
         `Auto Attach enabled: ${device.vid}:${device.pid}`
       );
     }
@@ -359,12 +566,12 @@ async function showAttachedDevices() {
       (device) => isAttached(device)
     );
     if (attached.length === 0) {
-      vscode.window.showInformationMessage(
+      vscode2.window.showInformationMessage(
         "No USB devices are attached to WSL."
       );
       return;
     }
-    await vscode.window.showQuickPick(
+    await vscode2.window.showQuickPick(
       attached.map((device) => ({
         label: `${device.vid}:${device.pid}`,
         description: device.device,
@@ -384,7 +591,7 @@ function selectedState(device) {
 }
 function showError(error) {
   const message = error instanceof Error ? error.message : String(error);
-  vscode.window.showErrorMessage(
+  vscode2.window.showErrorMessage(
     `WSL USB Manager: ${message}`
   );
 }
@@ -415,23 +622,27 @@ async function processAutoAttach() {
   try {
     const devices = await listUsbDevices();
     const currentBusIds = new Set(
-      devices.map(
-        (device) => device.busId
-      )
+      devices.map((device) => device.busId)
     );
     for (const busId of Array.from(autoAttachedBusIds)) {
       if (!currentBusIds.has(busId)) {
-        autoAttachedBusIds.delete(
-          busId
-        );
+        autoAttachedBusIds.delete(busId);
       }
     }
     const autoDevices = store.getAll();
+    let deviceStateChanged = false;
     for (const device of devices) {
       const matched = autoDevices.some(
         (rule) => rule.vid.toLowerCase() === device.vid.toLowerCase() && rule.pid.toLowerCase() === device.pid.toLowerCase()
       );
       if (!matched) {
+        continue;
+      }
+      const key = getDeviceKey(
+        device.vid,
+        device.pid
+      );
+      if (autoAttachSuppressed.has(key)) {
         continue;
       }
       if (isAttached(device)) {
@@ -450,6 +661,7 @@ async function processAutoAttach() {
         autoAttachedBusIds.add(
           device.busId
         );
+        deviceStateChanged = true;
         console.log(
           `[WSL USB] Attached ${device.vid}:${device.pid} BUSID=${device.busId}`
         );
@@ -459,6 +671,16 @@ async function processAutoAttach() {
           error
         );
       }
+    }
+    const latestDevices = deviceStateChanged ? await listUsbDevices() : devices;
+    const snapshot = createDeviceSnapshot(
+      latestDevices
+    );
+    if (snapshot !== lastDeviceSnapshot) {
+      lastDeviceSnapshot = snapshot;
+      treeProvider.updateDevices(
+        latestDevices
+      );
     }
   } catch (error) {
     console.error(
@@ -479,6 +701,7 @@ async function detachAutoAttachedDevices() {
       await detachUsbDevice(
         busId
       );
+      treeProvider.refresh();
       autoAttachedBusIds.delete(
         busId
       );
@@ -492,6 +715,92 @@ async function detachAutoAttachedDevices() {
       );
     }
   }
+}
+function createDeviceSnapshot(devices) {
+  return devices.map(
+    (device) => [
+      device.busId,
+      device.vid,
+      device.pid,
+      device.state,
+      store.has(device.vid, device.pid) ? "auto" : "manual"
+    ].join("|")
+  ).sort().join("\n");
+}
+async function refreshUsbDevices() {
+  const devices = await listUsbDevices();
+  treeProvider.updateDevices(
+    devices
+  );
+  return devices;
+}
+async function attachTreeDevice(node) {
+  try {
+    if (!node?.device) {
+      return;
+    }
+    autoAttachSuppressed.delete(
+      getDeviceKey(
+        node.device.vid,
+        node.device.pid
+      )
+    );
+    await attachUsbDevice(
+      node.device.busId
+    );
+    await refreshUsbDevices();
+    vscode2.window.showInformationMessage(
+      `Attached ${node.device.device} to WSL`
+    );
+  } catch (error) {
+    showError(error);
+  }
+}
+async function detachTreeDevice(node) {
+  try {
+    if (!node?.device) {
+      return;
+    }
+    autoAttachSuppressed.add(
+      getDeviceKey(
+        node.device.vid,
+        node.device.pid
+      )
+    );
+    autoAttachedBusIds.delete(
+      node.device.busId
+    );
+    await detachUsbDevice(
+      node.device.busId
+    );
+    await refreshUsbDevices();
+    vscode2.window.showInformationMessage(
+      `Detached ${node.device.device}`
+    );
+  } catch (error) {
+    showError(error);
+  }
+}
+async function enableTreeAutoAttach(node) {
+  if (!node?.device) {
+    return;
+  }
+  await store.add({
+    vid: node.device.vid,
+    pid: node.device.pid,
+    name: node.device.device
+  });
+  treeProvider.refresh();
+}
+async function disableTreeAutoAttach(node) {
+  if (!node?.device) {
+    return;
+  }
+  await store.remove(
+    node.device.vid,
+    node.device.pid
+  );
+  treeProvider.refresh();
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
