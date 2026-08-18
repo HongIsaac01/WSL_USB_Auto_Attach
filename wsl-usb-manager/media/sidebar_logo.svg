@@ -1,0 +1,156 @@
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="0.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+>
+    <!-- Switch arrows -->
+    <path d="M9.2 3.4C10.6 2.3 13.4 2.3 14.8 3.4" />
+    <path d="M14.8 3.4L14.05 2.55" />
+    <path d="M14.8 3.4L13.75 3.75" />
+
+    <path d="M14.8 4.5C13.4 5.6 10.6 5.6 9.2 4.5" />
+    <path d="M9.2 4.5L9.95 5.35" />
+    <path d="M9.2 4.5L10.25 4.15" />
+
+
+    <!-- Windows panel -->
+    <rect
+        x="2"
+        y="6"
+        width="7"
+        height="5"
+        rx="0.8"
+    />
+
+    <!-- Windows logo -->
+    <path
+        d="
+            M3.35 7.25
+            L5.1 7.05
+            V8.45
+            H3.35
+            Z
+
+            M5.5 7
+            L7.55 6.75
+            V8.45
+            H5.5
+            Z
+
+            M3.35 8.85
+            H5.1
+            V10.25
+            L3.35 10.05
+            Z
+
+            M5.5 8.85
+            H7.55
+            V10.55
+            L5.5 10.3
+            Z
+        "
+        fill="currentColor"
+        stroke="none"
+    />
+
+
+    <!-- Linux / WSL panel -->
+    <rect
+        x="15"
+        y="6"
+        width="7"
+        height="5"
+        rx="0.8"
+    />
+
+    <!-- Terminal prompt -->
+    <path d="M16.4 7.5L17.7 8.5L16.4 9.5" />
+    <path d="M18.3 9.5H20.1" />
+
+
+    <!-- Connection branches -->
+    <path
+        d="
+            M5.5 11
+            V12.2
+            C5.5 13.3
+            6.4 14
+            7.6 14
+            H9
+        "
+    />
+
+    <path
+        d="
+            M18.5 11
+            V12.2
+            C18.5 13.3
+            17.6 14
+            16.4 14
+            H15
+        "
+    />
+
+    <!-- Branches into central USB -->
+    <path d="M9 14C10.2 14 11 14.5 12 15.4" />
+    <path d="M15 14C13.8 14 13 14.5 12 15.4" />
+
+
+    <!-- Standard USB trident -->
+    <path d="M12 15.5V10.8" />
+
+    <!-- Up arrow -->
+    <path d="M12 10.8V9.4" />
+    <path d="M12 9.4L11.45 10" />
+    <path d="M12 9.4L12.55 10" />
+
+    <!-- Left USB branch -->
+    <path d="M12 12.8L10.4 11.6V10.7" />
+
+    <circle
+        cx="10.4"
+        cy="10.25"
+        r="0.45"
+    />
+
+    <!-- Right USB branch -->
+    <path d="M12 13.5L13.6 12.3V11.1" />
+
+    <rect
+        x="13.2"
+        y="10.7"
+        width="0.8"
+        height="0.8"
+        rx="0.05"
+    />
+
+
+    <!-- USB-C cable -->
+    <path d="M12 15.5V17" />
+
+
+    <!-- USB-C connector outer -->
+    <rect
+        x="8.7"
+        y="17"
+        width="6.6"
+        height="3.7"
+        rx="1.6"
+    />
+
+    <!-- USB-C opening -->
+    <rect
+        x="9.8"
+        y="18.05"
+        width="4.4"
+        height="1.55"
+        rx="0.75"
+    />
+
+    <!-- USB-C center tongue -->
+    <path d="M10.7 18.82H13.3" />
+</svg>
