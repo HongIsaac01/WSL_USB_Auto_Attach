@@ -25,7 +25,8 @@
     "onCommand:wslUsbManager.treeAttach",
     "onCommand:wslUsbManager.treeDetach",
     "onCommand:wslUsbManager.treeEnableAutoAttach",
-    "onCommand:wslUsbManager.treeDisableAutoAttach"
+    "onCommand:wslUsbManager.treeDisableAutoAttach",
+    "onCommand:wslUsbManager.renameDevice"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -76,6 +77,11 @@
           "command": "wslUsbManager.treeDisableAutoAttach",
           "title": "Disable Auto Attach",
           "icon": "$(close)"
+      },
+      {
+          "command": "wslUsbManager.renameDevice",
+          "title": "Rename Device",
+          "icon": "$(edit)"
       }
     ],
     "viewsContainers": {
@@ -154,6 +160,11 @@
               "command": "wslUsbManager.treeDisableAutoAttach",
               "when": "view == wslUsbManager.devicesView && viewItem == managedAvailableDevice",
               "group": "inline"
+          },
+          {
+              "command": "wslUsbManager.renameDevice",
+              "when": "view == wslUsbManager.devicesView && viewItem =~ /Device$/",
+              "group": "edit@1"
           }
       ]
     }

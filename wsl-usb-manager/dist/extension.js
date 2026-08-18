@@ -166,10 +166,12 @@ var AutoAttachStore = class {
 // src/deviceTreeProvider.ts
 var vscode = __toESM(require("vscode"));
 var DeviceTreeProvider = class {
-  constructor(store2) {
+  constructor(store2, aliasStore2) {
     this.store = store2;
+    this.aliasStore = aliasStore2;
   }
   store;
+  aliasStore;
   _onDidChangeTreeData = new vscode.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   //
@@ -204,18 +206,23 @@ var DeviceTreeProvider = class {
       device.pid
     );
     const disconnected = device.state === "Disconnected";
+    const alias = this.aliasStore.get(
+      device.vid,
+      device.pid
+    );
     const item = new vscode.TreeItem(
-      device.device,
+      alias ?? device.device,
       vscode.TreeItemCollapsibleState.None
     );
     item.description = disconnected ? `${device.vid}:${device.pid} \xB7 Disconnected` : `${device.vid}:${device.pid}`;
     item.tooltip = [
-      device.device,
+      alias ? `Name: ${alias}` : void 0,
+      `Device: ${device.device}`,
       `VID:PID: ${device.vid}:${device.pid}`,
       device.busId ? `BUSID: ${device.busId}` : "BUSID: Not connected",
       disconnected ? "State: Disconnected" : `State: ${getDeviceStateLabel(device)}`,
       `Auto Attach: ${autoAttach ? "ON" : "OFF"}`
-    ].join("\n");
+    ].filter(Boolean).join("\n");
     if (element.section === "attached") {
       item.contextValue = autoAttach ? "attachedAutoDevice" : "attachedDevice";
       item.iconPath = new vscode.ThemeIcon(
@@ -310,7 +317,53 @@ var DeviceTreeProvider = class {
   }
 };
 
+// src/deviceAliasStore.ts
+var STORAGE_KEY2 = "deviceAliases";
+var DeviceAliasStore = class {
+  constructor(context) {
+    this.context = context;
+  }
+  context;
+  makeKey(vid, pid) {
+    return `${vid.toLowerCase()}:${pid.toLowerCase()}`;
+  }
+  get(vid, pid) {
+    const aliases = this.context.globalState.get(
+      STORAGE_KEY2,
+      {}
+    );
+    return aliases[this.makeKey(vid, pid)];
+  }
+  async set(vid, pid, alias) {
+    const aliases = {
+      ...this.context.globalState.get(
+        STORAGE_KEY2,
+        {}
+      )
+    };
+    aliases[this.makeKey(vid, pid)] = alias;
+    await this.context.globalState.update(
+      STORAGE_KEY2,
+      aliases
+    );
+  }
+  async remove(vid, pid) {
+    const aliases = {
+      ...this.context.globalState.get(
+        STORAGE_KEY2,
+        {}
+      )
+    };
+    delete aliases[this.makeKey(vid, pid)];
+    await this.context.globalState.update(
+      STORAGE_KEY2,
+      aliases
+    );
+  }
+};
+
 // src/extension.ts
+var aliasStore;
 var store;
 var autoAttachTimer;
 var autoAttachRunning = false;
@@ -330,6 +383,11 @@ function activate(context) {
     vscode2.env.remoteName
   );
   store = new AutoAttachStore(context);
+  aliasStore = new DeviceAliasStore(context);
+  treeProvider = new DeviceTreeProvider(
+    store,
+    aliasStore
+  );
   context.subscriptions.push(
     vscode2.commands.registerCommand(
       "wslUsbManager.showDevices",
@@ -376,9 +434,12 @@ function activate(context) {
           showError(error);
         }
       }
+    ),
+    vscode2.commands.registerCommand(
+      "wslUsbManager.renameDevice",
+      renameTreeDevice
     )
   );
-  treeProvider = new DeviceTreeProvider(store);
   const treeView = vscode2.window.createTreeView(
     "wslUsbManager.devicesView",
     {
@@ -629,6 +690,19 @@ async function processAutoAttach() {
         autoAttachedBusIds.delete(busId);
       }
     }
+    const currentDeviceKeys = new Set(
+      devices.map(
+        (device) => getDeviceKey(
+          device.vid,
+          device.pid
+        )
+      )
+    );
+    for (const key of Array.from(autoAttachSuppressed)) {
+      if (!currentDeviceKeys.has(key)) {
+        autoAttachSuppressed.delete(key);
+      }
+    }
     const autoDevices = store.getAll();
     let deviceStateChanged = false;
     for (const device of devices) {
@@ -799,6 +873,34 @@ async function disableTreeAutoAttach(node) {
   await store.remove(
     node.device.vid,
     node.device.pid
+  );
+  treeProvider.refresh();
+}
+async function renameTreeDevice(node) {
+  if (!node?.device) {
+    return;
+  }
+  const currentAlias = aliasStore.get(
+    node.device.vid,
+    node.device.pid
+  );
+  const alias = await vscode2.window.showInputBox({
+    title: "USB Device Alias",
+    prompt: "Enter a name for this USB device",
+    value: currentAlias ?? node.device.device,
+    placeHolder: "e.g. NU Board"
+  });
+  if (alias === void 0) {
+    return;
+  }
+  const trimmed = alias.trim();
+  if (!trimmed) {
+    return;
+  }
+  await aliasStore.set(
+    node.device.vid,
+    node.device.pid,
+    trimmed
   );
   treeProvider.refresh();
 }

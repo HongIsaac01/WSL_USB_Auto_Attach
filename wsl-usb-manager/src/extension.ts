@@ -17,6 +17,11 @@ import {
     DeviceTreeProvider
 } from './deviceTreeProvider';
 
+import {
+    DeviceAliasStore
+} from './deviceAliasStore';
+
+let aliasStore: DeviceAliasStore;
 let store: AutoAttachStore;
 let autoAttachTimer: NodeJS.Timeout | undefined;
 let autoAttachRunning = false;
@@ -45,8 +50,14 @@ export function activate(
         vscode.env.remoteName
     );
 
-    store =
-        new AutoAttachStore(context);
+    store = new AutoAttachStore(context);
+
+    aliasStore = new DeviceAliasStore(context);
+
+    treeProvider = new DeviceTreeProvider(
+        store,
+        aliasStore
+    );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(
@@ -101,11 +112,12 @@ export function activate(
                     showError(error);
                 }
             }
+        ),
+        vscode.commands.registerCommand(
+            'wslUsbManager.renameDevice',
+            renameTreeDevice
         )
     );
-
-    treeProvider =
-        new DeviceTreeProvider(store);
 
     const treeView =
         vscode.window.createTreeView(
@@ -472,9 +484,39 @@ async function processAutoAttach(): Promise<void> {
             devices.map(device => device.busId)
         );
 
+        //
+        // 더 이상 연결되어 있지 않은
+        // Auto Attach 소유 BUSID 제거
+        //
         for (const busId of Array.from(autoAttachedBusIds)) {
             if (!currentBusIds.has(busId)) {
                 autoAttachedBusIds.delete(busId);
+            }
+        }
+
+        //
+        // 현재 연결되어 있는 VID:PID 목록
+        //
+        const currentDeviceKeys = new Set(
+            devices.map(
+                device =>
+                    getDeviceKey(
+                        device.vid,
+                        device.pid
+                    )
+            )
+        );
+
+        //
+        // 수동 Detach 후 실제로 USB가 제거되었다면
+        // suppression을 해제한다.
+        //
+        for (
+            const key
+            of Array.from(autoAttachSuppressed)
+        ) {
+            if (!currentDeviceKeys.has(key)) {
+                autoAttachSuppressed.delete(key);
             }
         }
 
@@ -731,6 +773,49 @@ async function disableTreeAutoAttach(
     await store.remove(
         node.device.vid,
         node.device.pid
+    );
+
+    treeProvider.refresh();
+}
+async function renameTreeDevice(
+    node: any
+): Promise<void> {
+    if (!node?.device) {
+        return;
+    }
+
+    const currentAlias =
+        aliasStore.get(
+            node.device.vid,
+            node.device.pid
+        );
+
+    const alias =
+        await vscode.window.showInputBox({
+            title: 'USB Device Alias',
+            prompt: 'Enter a name for this USB device',
+            value:
+                currentAlias ??
+                node.device.device,
+            placeHolder:
+                'e.g. NU Board'
+        });
+
+    if (alias === undefined) {
+        return;
+    }
+
+    const trimmed =
+        alias.trim();
+
+    if (!trimmed) {
+        return;
+    }
+
+    await aliasStore.set(
+        node.device.vid,
+        node.device.pid,
+        trimmed
     );
 
     treeProvider.refresh();

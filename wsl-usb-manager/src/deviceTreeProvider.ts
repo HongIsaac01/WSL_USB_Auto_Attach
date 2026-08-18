@@ -13,6 +13,10 @@ import {
     UsbDevice
 } from './types';
 
+import {
+    DeviceAliasStore
+} from './deviceAliasStore';
+
 
 type TreeNode =
     | SectionNode
@@ -58,8 +62,8 @@ implements vscode.TreeDataProvider<TreeNode> {
 
 
     constructor(
-        private readonly store:
-            AutoAttachStore
+    private readonly store: AutoAttachStore,
+        private readonly aliasStore: DeviceAliasStore
     ) {
     }
 
@@ -116,12 +120,15 @@ implements vscode.TreeDataProvider<TreeNode> {
             device.state === 'Disconnected';
 
 
-        const item =
-            new vscode.TreeItem(
-                device.device,
-                vscode.TreeItemCollapsibleState.None
-            );
+        const alias = this.aliasStore.get(
+            device.vid,
+            device.pid
+        );
 
+        const item = new vscode.TreeItem(
+            alias ?? device.device,
+            vscode.TreeItemCollapsibleState.None
+        );
 
         item.description =
             disconnected
@@ -129,22 +136,24 @@ implements vscode.TreeDataProvider<TreeNode> {
                 : `${device.vid}:${device.pid}`;
 
 
-        item.tooltip =
-            [
-                device.device,
+        item.tooltip = [
+            alias
+                ? `Name: ${alias}`
+                : undefined,
 
-                `VID:PID: ${device.vid}:${device.pid}`,
+            `Device: ${device.device}`,
+            `VID:PID: ${device.vid}:${device.pid}`,
 
-                device.busId
-                    ? `BUSID: ${device.busId}`
-                    : 'BUSID: Not connected',
+            device.busId
+                ? `BUSID: ${device.busId}`
+                : 'BUSID: Not connected',
 
-                disconnected
-                    ? 'State: Disconnected'
-                    : `State: ${getDeviceStateLabel(device)}`,
+            disconnected
+                ? 'State: Disconnected'
+                : `State: ${getDeviceStateLabel(device)}`,
 
-                `Auto Attach: ${autoAttach ? 'ON' : 'OFF'}`
-            ].join('\n');
+            `Auto Attach: ${autoAttach ? 'ON' : 'OFF'}`
+        ].filter(Boolean).join('\n');
 
 
         //
