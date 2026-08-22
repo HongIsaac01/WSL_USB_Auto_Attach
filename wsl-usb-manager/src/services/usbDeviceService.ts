@@ -135,8 +135,8 @@ export class UsbDeviceService {
     /**
      * USB 장치를 WSL에 Attach한다.
      *
-     * 장치가 아직 Shared 상태가 아니면
-     * 먼저 Windows 측에서 bind를 수행한 뒤 Attach한다.
+     * 장치가 Shared 상태가 아니면
+     * Windows 관리자 권한으로 bind를 먼저 수행한 뒤 Attach한다.
      */
     async attach(
         device: UsbDevice,
@@ -149,14 +149,30 @@ export class UsbDeviceService {
             );
         }
 
+        console.log(
+            `[WSL USB] Attach request ` +
+            `BUSID=${device.busId} ` +
+            `STATE=${device.state}`
+        );
+
         if (
             !this.isAttached(device) &&
             !this.isShared(device)
         ) {
+            console.log(
+                `[WSL USB] Binding ` +
+                `BUSID=${device.busId}`
+            );
+
             await this.usbipdService.bind(
                 device.busId
             );
         }
+
+        console.log(
+            `[WSL USB] Attaching ` +
+            `BUSID=${device.busId}`
+        );
 
         await this.usbipdService.attach(
             device.busId
@@ -166,7 +182,6 @@ export class UsbDeviceService {
             await this.refresh();
         }
     }
-
 
     /**
      * USB 장치를 WSL에서 Detach한다.
@@ -238,6 +253,7 @@ export class UsbDeviceService {
 
         const state =
             device.state
+                .trim()
                 .toLowerCase();
 
         if (
@@ -249,9 +265,7 @@ export class UsbDeviceService {
         }
 
         if (
-            state.includes(
-                'shared'
-            )
+            state === 'shared'
         ) {
             return 'Shared / Ready';
         }
@@ -291,8 +305,11 @@ export class UsbDeviceService {
         device: UsbDevice
     ): boolean {
 
-        return device.state
-            .toLowerCase()
-            .includes('shared');
+        return (
+            device.state
+                .trim()
+                .toLowerCase() ===
+            'shared'
+        );
     }
 }

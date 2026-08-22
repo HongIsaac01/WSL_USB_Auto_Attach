@@ -210,12 +210,6 @@ export class AutoAttachService {
                     continue;
                 }
 
-                if (
-                    !this.isShared(device)
-                ) {
-                    continue;
-                }
-
                 try {
                     console.log(
                         `[WSL USB] Auto attaching ` +
@@ -386,20 +380,6 @@ export class AutoAttachService {
             )
         );
     }
-
-
-    /**
-     * usbipd attach가 가능한 Shared 상태인지 확인한다.
-     */
-    private isShared(
-        device: UsbDevice
-    ): boolean {
-
-        return device.state
-            .toLowerCase()
-            .includes('shared');
-    }
-
 
     /**
      * Extension session 종료 시

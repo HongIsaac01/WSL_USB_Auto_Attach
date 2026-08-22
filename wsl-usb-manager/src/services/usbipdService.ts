@@ -266,7 +266,8 @@ export class UsbipdService {
     /**
      * 지정한 BUSID 장치를 Windows에서 공유한다.
      *
-     * usbipd bind는 관리자 권한이 필요하다.
+     * usbipd bind는 관리자 권한이 필요하므로
+     * Windows PowerShell을 관리자 권한으로 실행한다.
      */
     async bind(
         busId: string
@@ -278,10 +279,23 @@ export class UsbipdService {
             );
         }
 
-        await this.execute([
-            'bind',
-            '--busid',
-            busId
-        ]);
+        const command =
+            `Start-Process ` +
+            `-FilePath "usbipd.exe" ` +
+            `-ArgumentList "bind --busid ${busId}" ` +
+            `-Verb RunAs ` +
+            `-Wait`;
+
+        await execFileAsync(
+            'powershell.exe',
+            [
+                '-NoProfile',
+                '-Command',
+                command
+            ],
+            {
+                windowsHide: true
+            }
+        );
     }
 }
