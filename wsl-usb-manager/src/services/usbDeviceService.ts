@@ -132,15 +132,11 @@ export class UsbDeviceService {
             );
     }
 
-
     /**
      * USB 장치를 WSL에 Attach한다.
      *
-     * refreshAfter가 true이면
-     * Attach 후 최신 USB 상태를 다시 읽는다.
-     *
-     * Auto Attach loop에서는 여러 장치를 처리한 후
-     * 한 번만 refresh하기 위해 false를 사용할 수 있다.
+     * 장치가 아직 Shared 상태가 아니면
+     * 먼저 Windows 측에서 bind를 수행한 뒤 Attach한다.
      */
     async attach(
         device: UsbDevice,
@@ -150,6 +146,15 @@ export class UsbDeviceService {
         if (!device.busId) {
             throw new Error(
                 'Cannot attach device without BUSID.'
+            );
+        }
+
+        if (
+            !this.isAttached(device) &&
+            !this.isShared(device)
+        ) {
+            await this.usbipdService.bind(
+                device.busId
             );
         }
 
@@ -277,5 +282,17 @@ export class UsbDeviceService {
             )
             .sort()
             .join('\n');
+    }
+    
+    /**
+     * 장치가 현재 Windows에서 Shared 상태인지 확인한다.
+     */
+    isShared(
+        device: UsbDevice
+    ): boolean {
+
+        return device.state
+            .toLowerCase()
+            .includes('shared');
     }
 }

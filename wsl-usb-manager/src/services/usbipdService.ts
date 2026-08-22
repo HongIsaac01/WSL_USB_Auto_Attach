@@ -262,4 +262,26 @@ export class UsbipdService {
             `usbipd.exe ${args.join(' ')} failed: ${String(error)}`
         );
     }
+
+    /**
+     * 지정한 BUSID 장치를 Windows에서 공유한다.
+     *
+     * usbipd bind는 관리자 권한이 필요하다.
+     */
+    async bind(
+        busId: string
+    ): Promise<void> {
+
+        if (!busId) {
+            throw new Error(
+                'BUSID is required for bind.'
+            );
+        }
+
+        await this.execute([
+            'bind',
+            '--busid',
+            busId
+        ]);
+    }
 }
